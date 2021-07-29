@@ -15,6 +15,10 @@ $app->post('/registrasi', function ($request, $response) {
 		$hasilx = $this->db->query("insert into pengguna set usernama='$usernama',
 																email='$email',
 																pass='$pass'");
+
+																$id = $this->db->lastInsertId();
+
+																echo $id;
 });
 
 $app->put('/login', function ($request, $response) {
@@ -37,7 +41,7 @@ $app->put('/login', function ($request, $response) {
 
    
 		#update last_login
-		$updatex = $this->db->query("update pengguna set token_app='$token',
+		$updatex = $this->db->query("update pengguna set token_app='$token' 
     	where usernama='$usernama' and pass='$pass'");
 
 

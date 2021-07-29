@@ -20,5 +20,5 @@ $container['logger'] = function ($c) {
 
 #buat container untuk database PDO
 $container['db'] = function(){
-  return new PDO('mysql:local=localhost;dbname=psdigital', 'root', '');	
+  return new PDO('mysql:local=localhost;dbname=simple', 'root', '');	
 };
