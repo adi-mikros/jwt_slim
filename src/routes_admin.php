@@ -12,13 +12,29 @@ $app->post('/registrasi', function ($request, $response) {
 	$email = $req->email;
 	$pass = $req->pass;
 
-		$hasilx = $this->db->query("insert into pengguna set usernama='$usernama',
+	//cek usernama udah digunakan atau belum
+	$jum = $this->db->query("select count(*) FROM pengguna where usernama='$usernama'")->fetchColumn();
+	if ($jum > 0) {
+		$pesan="Nama Pengguna udah digunakan. ganti yang lain!";
+		$rows=array();
+		array_push($rows, array('status'=>'gagal','pesan'=>$pesan));
+		$json = json_encode($rows[0]);
+		print_r($json);
+		return;
+	}
+
+	$hasilx = $this->db->query("insert into pengguna set usernama='$usernama',
 																email='$email',
 																pass='$pass'");
 
-																$id = $this->db->lastInsertId();
+	$id = $this->db->lastInsertId();
 
-																echo $id;
+	$pesan="Registrasi berhasil!";
+	$rows=array();
+	array_push($rows, array('status'=>'sukses','pesan'=>$pesan, 'idx'=>$id));
+	$json = json_encode($rows[0]);
+	print_r($json);
+
 });
 
 $app->put('/login', function ($request, $response) {
@@ -35,7 +51,8 @@ $app->put('/login', function ($request, $response) {
 	if ($jum > 0) {
 		#tampilkan data untuk user
 		$time = time(); //untuk waktu saat ini
-		$exp =  date("m/d/Y h:i:s a", time() + 2592000); //untuk waktu exp token diitung detik
+		// $exp =  date("m/d/Y h:i:s a", time() + 2592000); //untuk waktu exp token diitung detik
+		$exp =  time() + 2592000; //untuk waktu exp token diitung detik selama 1 bulan
 		$settings = $this->get('settings'); // get settings array.
 		$token = JWT::encode(['usernama' => $usernama,  "iat" => $time, "exp" => $exp], $settings['jwt']['secret'], "HS256");
 
@@ -45,7 +62,7 @@ $app->put('/login', function ($request, $response) {
     	where usernama='$usernama' and pass='$pass'");
 
 
-		$hasilx = $this->db->query("select * from pengguna where usernama='$usernama' and pass='$pass'")->fetch(PDO::FETCH_ASSOC);
+		$hasilx = $this->db->query("select usernama,token_app,id,email from pengguna where usernama='$usernama' and pass='$pass'")->fetch(PDO::FETCH_ASSOC);
 		$pesan="Login berhasil!";
 		$rows=array();
 		array_push($rows, array('status'=>'sukses','pesan'=>$pesan,'data'=>$hasilx));
@@ -68,59 +85,27 @@ $app->get('/cekkoneksi', function ($request, $response) {
 
 
 $app->group('/api', function (\Slim\App $app) {
-	#cek token masih aktif tidak
-	$app->put('/cektoken', function ($request, $response, $datae) {
-		$kiriman = $request->getBody();
-		$datakirim = json_decode($kiriman);
-		$usernama = $datakirim->usernama;
-
+	#ambil data user
+	$app->get('/pengguna', function ($request, $response) {
 		$otentifikasi = $request->getHeaderLine('authorization');
 		$otentifikasi = str_replace("Bearer ", "", $otentifikasi);
 		//cek token betul gag
-		$jum = $this->db->query("select count(*) from user where token_app='$otentifikasi'")->fetchColumn();
-		if ($jum <= 0) {
-			echo 'blokirbos';
-		}
-
-		#ambil iduser dari database
-		$hasilapp = $this->db->query("select * from user where token_app='$otentifikasi'")->fetch(PDO::FETCH_ASSOC);
-		$iduser = $hasilapp['iduser'];
-
-		#update last_aktif
-		$hasil = $this->db->query("update user set last_aktif=now() where iduser='$iduser' and token_app='$otentifikasi' and hapus='0'");
-
-		#jika nomor tidak sesuai dengan token langsunk logout juga aja
-		$jumhasil2 = $this->db->query("select count(*) from user where iduser='$iduser' and  token_app='$otentifikasi' and hapus='0'")->fetchColumn();
-		if ($jumhasil2 <= 0) {
-			echo 'blokirbos';
-		}
-	});
-
-
-	#input data 
-	$app->post('/gantipass', function ($request, $response) {
-
-		$otentifikasi = $request->getHeaderLine('authorization');
-		$otentifikasi = str_replace("Bearer ", "", $otentifikasi);
-
-		#ambil $idskul
-		$hasil2 = $this->db->query("select * from user where token_app='$otentifikasi'")->fetch(PDO::FETCH_ASSOC);
-		$iduser = $hasil2['iduser'];
-
-
-		//cek token betul gag
-		$jum = $this->db->query("select count(*) from user where iduser='$iduser' and token_app='$otentifikasi'")->fetchColumn();
+		$jum = $this->db->query("select count(*) from pengguna where token_app='$otentifikasi'")->fetchColumn();
 		if ($jum <= 0) {
 			return;
 		}
-		#update last_aktif
-		$hasil = $this->db->query("update user set last_aktif=now() where iduser='$iduser' and token_app='$otentifikasi'");
+		#ambil iduser dari database
+		$hasilapp = $this->db->query("select * from pengguna where token_app='$otentifikasi'")->fetch(PDO::FETCH_ASSOC);
+		$usernama = $hasilapp['usernama'];
+		$pass = $hasilapp['pass'];
 
-		$postdata = $request->getBody(); #--> Sama dengan :  $postdata = file_get_contents("php://input");
-		$req = json_decode($postdata);
-
-		$pass = $req->pass;
-
-		$hasil = $this->db->query("update user set pass='$pass' where iduser='$iduser'");
+		$hasilx = $this->db->query("select usernama,token_app,id,email from pengguna where usernama='$usernama' and pass='$pass'")->fetch(PDO::FETCH_ASSOC);
+		$json = json_encode($hasilx);
+		print_r($json);
 	});
-});
+
+	$app->get('/bro', function ($request, $response) {
+		echo  $request->getAttribute('usernama');
+	});
+
+})->add($adijwt);
